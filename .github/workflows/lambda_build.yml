@@ -7,6 +7,7 @@ on:
       - feature/**
       - root/**
       - main
+  pull_request:
 
 permissions:
   contents: read
@@ -16,7 +17,7 @@ env:
   LAMBDA_FUNCTION_NAME: course-service
 
 jobs:
-  build-and-deploy:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
@@ -30,21 +31,24 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Build ZIP with Maven (assembly-zip profile)
-        run: mvn -B -P assembly-zip -DskipTests package
+      - name: Build and run tests
+        run: mvn -B clean verify
 
-      - name: Upload build artifact (ZIP)
+      - name: Package ZIP (assembly-zip profile)
+        run: mvn -B -P assembly-zip package
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lambda-zip
+          name: lambda-package
           path: target/*.zip
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Verify AWS CLI
-        run: aws --version
+      - name: Display test summary
+        if: always()
+        run: |
+          echo "----- Maven Test Summary -----"
+          if [ -f target/surefire-reports/TEST-*.xml ]; then
+            grep -H "<testsuite" target/surefire-reports/TEST-*.xml | sed 's/.*name=\"//;s/\" time=.*//'
+          else
+            echo "No test results found."
+          fi
