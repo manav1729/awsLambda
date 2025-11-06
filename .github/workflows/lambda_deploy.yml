@@ -1,32 +1,70 @@
-name: Deploy Lambda Function
+name: Lambda Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: eu-east-1
+  LAMBDA_FUNCTION_NAME: course-service
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
-          distribution: 'oracle'
+          distribution: temurin
+          java-version: "21"
           cache: maven
-      - name: Build with Maven
-        run: mvn clean install
-      - name: Install zip tool
-        uses: montudor/action-zip@v1
-      - name: Create Zip file for Lambda function
-        run: zip -r springBootJavaAwsLambda-1.0-SNAPSHOT-lambda-package.zip .
-      - name: AWS CLI v2
-        uses: imehedi/actions-awscli-v2@latest
+
+      - name: Build ZIP with Maven (assembly-zip profile)
+        run: mvn -B -P assembly-zip -DskipTests package
+
+      - name: Upload build artifact (ZIP)
+        uses: actions/upload-artifact@v4
         with:
-          args: "lambda update-function-code --function-name arn:aws:lambda:eu-north-1:842477702704:function:course-service --zip-file fileb://springBootJavaAwsLambda-1.0-SNAPSHOT-lambda-package.zip"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: "us-east-1"
+          name: lambda-zip
+          path: target/*.zip
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y awscli
+
+      - name: Deploy ZIP to Lambda
+        run: |
+          set -euo pipefail
+          ZIP_FILE="$(ls -t target/*.zip | head -n1)"
+          echo "Deploying $ZIP_FILE to Lambda function ${LAMBDA_FUNCTION_NAME} in ${AWS_REGION}"
+          aws lambda update-function-code \
+            --function-name "${LAMBDA_FUNCTION_NAME}" \
+            --zip-file "fileb://${ZIP_FILE}" \
+            --region "${AWS_REGION}"
+
+      - name: Wait for update to complete
+        run: |
+          aws lambda wait function-updated \
+            --function-name "${LAMBDA_FUNCTION_NAME}" \
+            --region "${AWS_REGION}"
+          aws lambda get-function \
+            --function-name "${LAMBDA_FUNCTION_NAME}" \
+            --region "${AWS_REGION}" \
+            --query 'Configuration.[FunctionName,LastModified,Version,Runtime]' \
+            --output table
