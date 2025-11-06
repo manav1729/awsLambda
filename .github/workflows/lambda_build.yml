@@ -40,21 +40,21 @@ jobs:
       - name: Console test summary
         if: always()
         run: |
-           echo "----- Maven Surefire/Failsafe Summary -----"
-           found=false
-           for f in $(ls -1 **/target/surefire-reports/*.xml **/target/failsafe-reports/*.xml 2>/dev/null || true); do
-             found=true
-             # Print suite name and counters
-             SUITE=$(grep -o 'name="[^"]*"' "$f" | head -n1 | sed 's/name="//;s/"//')
-             TESTS=$(grep -o 'tests="[0-9]*"' "$f" | head -n1 | sed 's/tests="//;s/"//')
-             FAILS=$(grep -o 'failures="[0-9]*"' "$f" | head -n1 | sed 's/failures="//;s/"//')
-             ERRORS=$(grep -o 'errors="[0-9]*"' "$f" | head -n1 | sed 's/errors="//;s/"//')
-             SKIPPED=$(grep -o 'skipped="[0-9]*"' "$f" | head -n1 | sed 's/skipped="//;s/"//')
-             echo "• ${SUITE}  tests=${TESTS}  failures=${FAILS}  errors=${ERRORS}  skipped=${SKIPPED}"
-           done
-           if [ "$found" = false ]; then
-             echo "No JUnit XML found under target/*-reports. Did tests run?"
-           fi
+          echo "----- Maven Surefire/Failsafe Summary -----"
+          REPORTS=$(find . -type f -path "*/target/*-reports/*.xml" 2>/dev/null)
+          if [ -z "$REPORTS" ]; then
+            echo "❌ No JUnit XML found. Did tests run or are they in a submodule?"
+            ls -R .
+            exit 1
+          fi
+          for f in $REPORTS; do
+            SUITE=$(grep -o 'name="[^"]*"' "$f" | head -n1 | sed 's/name="//;s/"//')
+            TESTS=$(grep -o 'tests="[0-9]*"' "$f" | head -n1 | sed 's/tests="//;s/"//')
+            FAILS=$(grep -o 'failures="[0-9]*"' "$f" | head -n1 | sed 's/failures="//;s/"//')
+            ERRORS=$(grep -o 'errors="[0-9]*"' "$f" | head -n1 | sed 's/errors="//;s/"//')
+            SKIPPED=$(grep -o 'skipped="[0-9]*"' "$f" | head -n1 | sed 's/skipped="//;s/"//')
+            echo "• ${SUITE}  tests=${TESTS}  failures=${FAILS}  errors=${ERRORS}  skipped=${SKIPPED}"
+          done
 
       # ---- Upload JUnit XMLs as an artifact so you can download them ----
       - name: Upload JUnit XMLs
