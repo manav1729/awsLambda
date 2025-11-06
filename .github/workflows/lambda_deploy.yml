@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: read
+  checks: write           # needed to publish the annotated test report
+  pull-requests: write    # so the report appears on PRs
 
 env:
   AWS_REGION: eu-north-1
