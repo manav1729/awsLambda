@@ -43,10 +43,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y awscli
+      - name: Verify AWS CLI
+        run: aws --version
 
       - name: Deploy ZIP to Lambda
         run: |
