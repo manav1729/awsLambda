@@ -1,4 +1,4 @@
-name: Lambda build
+name: Lambda Build
 
 on:
   workflow_dispatch:
