@@ -39,16 +39,6 @@ jobs:
           name: lambda-zip
           path: target/*.zip
 
-      # 🟡 Manual approval step before deploying
-      - name: Wait for manual approval
-        uses: trstringer/manual-approval@v1
-        with:
-          approvers: manwendra.kishore@gmail.com
-          minimum-approvals: 1
-          issue-title: "Approve deployment to AWS Lambda"
-          issue-body: "Please approve to continue the deployment of the latest build to Lambda function: course-service."
-          secret: ''
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
