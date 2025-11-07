@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: read
+  checks: write           # needed to publish the annotated test report
+  pull-requests: write    # so the report appears on PRs
 
 env:
   AWS_REGION: eu-north-1
@@ -34,6 +36,37 @@ jobs:
       - name: Build and run tests
         run: mvn -B clean verify
 
+      # ---- Make results easily visible in the run log (quick summary) ----
+      - name: Console test summary
+        if: always()
+        run: |
+          echo "----- Maven Surefire/Failsafe Summary -----"
+          REPORTS=$(find . -type f \( -path "*/target/surefire-reports/TEST-*.xml" -o -path "*/target/failsafe-reports/TEST-*.xml" \) 2>/dev/null)
+          if [ -z "$REPORTS" ]; then
+            echo "No JUnit TEST-*.xml found. Did tests run?"
+            exit 0
+          fi
+          for f in $REPORTS; do
+            SUITE=$(grep -o 'name="[^"]*"' "$f" | head -n1 | sed 's/name="//;s/"//')
+            TESTS=$(grep -o 'tests="[0-9]*"' "$f" | head -n1 | sed 's/tests="//;s/"//')
+            FAILS=$(grep -o 'failures="[0-9]*"' "$f" | head -n1 | sed 's/failures="//;s/"//')
+            ERRORS=$(grep -o 'errors="[0-9]*"' "$f" | head -n1 | sed 's/errors="//;s/"//')
+            SKIPPED=$(grep -o 'skipped="[0-9]*"' "$f" | head -n1 | sed 's/skipped="//;s/"//')
+            echo "• ${SUITE}  tests=${TESTS}  failures=${FAILS}  errors=${ERRORS}  skipped=${SKIPPED}"
+          done
+
+      # Upload only real JUnit XMLs (avoid summary files)
+      - name: Upload JUnit XMLs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-xml
+          path: |
+            **/target/surefire-reports/TEST-*.xml
+            **/target/failsafe-reports/TEST-*.xml
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Package ZIP (assembly-zip profile)
         run: mvn -B -P assembly-zip package
 
@@ -43,12 +76,15 @@ jobs:
           name: lambda-package
           path: target/*.zip
 
-      - name: Display test summary
+      # ---- Publish a rich test report as a GitHub Check (per-file, with annotations) ----
+      - name: Publish Test Results
         if: always()
-        run: |
-          echo "----- Maven Test Summary -----"
-          if [ -f target/surefire-reports/TEST-*.xml ]; then
-            grep -H "<testsuite" target/surefire-reports/TEST-*.xml | sed 's/.*name=\"//;s/\" time=.*//'
-          else
-            echo "No test results found."
-          fi
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: |
+            **/target/surefire-reports/TEST-*.xml
+            **/target/failsafe-reports/TEST-*.xml
+          # Optional: don’t fail the job if parsing hiccups occur
+          check_name: "Test Results"
+          report_individual_runs: true
+          fail_on: nothing

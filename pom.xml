@@ -20,15 +20,19 @@
 
     <properties>
         <java.version>21</java.version>
+        <!-- You can keep this; junit-bom below will also control versions -->
         <junit.version>5.12.1</junit.version>
     </properties>
 
     <dependencies>
+        <!-- AWS serverless Spring Boot container -->
         <dependency>
             <groupId>com.amazonaws.serverless</groupId>
             <artifactId>aws-serverless-java-container-springboot3</artifactId>
             <version>2.1.5</version>
         </dependency>
+
+        <!-- Test helpers from the container (test-jar) -->
         <dependency>
             <groupId>com.amazonaws.serverless</groupId>
             <artifactId>aws-serverless-java-container-core</artifactId>
@@ -37,6 +41,8 @@
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
+
+        <!-- (Optional) HTTP client for tests -->
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
             <artifactId>httpclient5</artifactId>
@@ -44,6 +50,7 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Web without embedded Tomcat (Lambda uses the container) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -55,18 +62,29 @@
             </exclusions>
         </dependency>
 
+        <!-- JUnit Jupiter (can be kept; boot-starter-test also brings JUnit) -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Lombok (optional) -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+
+        <!-- ✅ Add Spring Boot's consolidated test starter -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
+    <!-- Keep JUnit versions aligned -->
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -79,7 +97,50 @@
         </dependencies>
     </dependencyManagement>
 
+    <!-- ✅ Ensure test reports are always written to target/*-reports -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+                <configuration>
+                    <useFile>true</useFile>
+                    <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+                    <!-- Enable JUnit 5 -->
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/*TestCase.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
+
+            <!-- Only needed if you have ITs named *IT.java (optional but harmless) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.2.5</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <reportsDirectory>${project.build.directory}/failsafe-reports</reportsDirectory>
+                    <includes>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
     <profiles>
+        <!-- Optional: shaded JAR build -->
         <profile>
             <id>shaded-jar</id>
             <build>
@@ -110,6 +171,8 @@
                 </plugins>
             </build>
         </profile>
+
+        <!-- ✅ Active profile that builds the Lambda ZIP -->
         <profile>
             <id>assembly-zip</id>
             <activation>
@@ -129,6 +192,7 @@
                             </execution>
                         </executions>
                     </plugin>
+
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-install-plugin</artifactId>
@@ -137,6 +201,7 @@
                             <skip>true</skip>
                         </configuration>
                     </plugin>
+
                     <!-- select and copy only runtime dependencies to a temporary lib folder -->
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
@@ -156,6 +221,7 @@
                             </execution>
                         </executions>
                     </plugin>
+
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-assembly-plugin</artifactId>
